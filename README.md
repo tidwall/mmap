@@ -28,6 +28,6 @@ Make sure to release the data when your done.
 mmap.Close(data)
 ```
 
-Don't read the `data` after running this operation otherwise your f*cked.
+Don't read the `data` after closing otherwise your f*cked.
 
 That's all, bye now
