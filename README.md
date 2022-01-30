@@ -1,6 +1,6 @@
 # mmap
 
-Load a huge file into a byte slice without actually reading any data.
+Load file-backed memory.
 
 ## Installing
 
