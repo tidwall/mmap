@@ -10,7 +10,7 @@ import (
 )
 
 var mmapMu sync.Mutex
-var mmapFiles = make(map[unsafe.Pointer]*os.File)
+var mmapFiles map[unsafe.Pointer]*os.File
 
 // Open will mmap a file to a byte slice of data.
 func Open(path string, writable bool) (data []byte, err error) {
@@ -36,6 +36,9 @@ func Open(path string, writable bool) (data []byte, err error) {
 	if runtime.GOOS == "windows" {
 		// Keep track of the file.
 		mmapMu.Lock()
+		if mmapFiles == nil {
+			mmapFiles = make(map[unsafe.Pointer]*os.File)
+		}
 		mmapFiles[unsafe.Pointer(&m[0])] = f
 		mmapMu.Unlock()
 	} else {
