@@ -1,7 +1,7 @@
 # mmap
 
 Load file-backed memory.  
-Uses github.com/edsrzf/mmap-go under the hood.
+Uses [edsrzf/mmap-go](https://github.com/edsrzf/mmap-go) under the hood.
 
 ## Installing
 
