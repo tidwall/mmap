@@ -9,22 +9,29 @@ import (
 	"github.com/edsrzf/mmap-go"
 )
 
-var mmapMu sync.Mutex
-var mmapFiles map[unsafe.Pointer]*os.File
+type mapContext struct {
+	f      *os.File
+	opened bool
+}
 
-// Open will mmap a file to a byte slice of data.
-func Open(path string, writable bool) (data []byte, err error) {
-	flag, prot := os.O_RDONLY, mmap.RDONLY
+var mmapMu sync.Mutex
+var mmapFiles map[unsafe.Pointer]mapContext
+
+// MapFile maps an opened file to a byte slice of data.
+func MapFile(f *os.File, writable bool) (data []byte, err error) {
+	prot := mmap.RDONLY
 	if writable {
-		flag, prot = os.O_RDWR, mmap.RDWR
+		prot = mmap.RDWR
 	}
-	f, err := os.OpenFile(path, flag, 0)
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
+	if fi.Size() == 0 {
+		return nil, nil
+	}
 	m, err := mmap.Map(f, prot, 0)
 	if err != nil {
-		f.Close()
 		return nil, err
 	}
 	if len(m) == 0 {
@@ -37,9 +44,40 @@ func Open(path string, writable bool) (data []byte, err error) {
 		// Keep track of the file.
 		mmapMu.Lock()
 		if mmapFiles == nil {
-			mmapFiles = make(map[unsafe.Pointer]*os.File)
+			mmapFiles = make(map[unsafe.Pointer]mapContext)
 		}
-		mmapFiles[unsafe.Pointer(&m[0])] = f
+		mmapFiles[unsafe.Pointer(&m[0])] = mapContext{f, false}
+		mmapMu.Unlock()
+	}
+	return []byte(m), nil
+}
+
+// Open will mmap a file to a byte slice of data.
+func Open(path string, writable bool) (data []byte, err error) {
+	flag := os.O_RDONLY
+	if writable {
+		flag = os.O_RDWR
+	}
+	f, err := os.OpenFile(path, flag, 0)
+	if err != nil {
+		return nil, err
+	}
+	m, err := MapFile(f, writable)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	if len(m) == 0 {
+		// Empty file. Release map
+		Close(m)
+		f.Close()
+		return nil, nil
+	}
+	if runtime.GOOS == "windows" {
+		mmapMu.Lock()
+		ctx := mmapFiles[unsafe.Pointer(&m[0])]
+		ctx.opened = true
+		mmapFiles[unsafe.Pointer(&m[0])] = ctx
 		mmapMu.Unlock()
 	} else {
 		// Allowed to close the file.
@@ -55,14 +93,16 @@ func Close(data []byte) error {
 	}
 	if runtime.GOOS == "windows" {
 		// Close file first
+		var ctx mapContext
+		var ok bool
 		mmapMu.Lock()
-		f, ok := mmapFiles[unsafe.Pointer(&data[0])]
+		ctx, ok = mmapFiles[unsafe.Pointer(&data[0])]
 		if ok {
 			delete(mmapFiles, unsafe.Pointer(&data[0]))
 		}
 		mmapMu.Unlock()
-		if f != nil {
-			f.Close()
+		if ok && ctx.opened {
+			ctx.f.Close()
 		}
 	}
 	m := mmap.MMap(data)
