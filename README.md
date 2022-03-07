@@ -1,6 +1,7 @@
 # mmap
 
-Load file-backed memory.
+Load file-backed memory.  
+Uses [edsrzf/mmap-go](https://github.com/edsrzf/mmap-go) under the hood.
 
 ## Installing
 
@@ -14,7 +15,7 @@ Load a bigole file into a byte slice. This happens pretty much instantly even
 if your file is many GBs.
 
 ```go
-data, err := mmap.Open("my-big-file.txt")
+data, err := mmap.Open("my-big-file.txt", false)
 if err != nil {
     panic(err)
 }
