@@ -108,3 +108,18 @@ func Close(data []byte) error {
 	m := mmap.MMap(data)
 	return m.Unmap()
 }
+
+// Create a new mmap file with the provided size
+func Create(path string, size int) ([]byte, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := f.WriteAt([]byte{0}, int64(size)-1); err != nil {
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+	return Open(path, true)
+}
